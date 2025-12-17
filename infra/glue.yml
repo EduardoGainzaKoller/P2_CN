@@ -1,7 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: |
-  Configuración de AWS Glue: Catálogo de datos, Crawler y Job ETL.
-  Punto 2.4.4 de la memoria técnica.
+Description: Configuración de AWS Glue. Catálogo de datos, Crawler y Job ETL.
 
 Resources:
 
