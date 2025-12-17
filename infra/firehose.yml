@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Configuración de Kinesis Firehose para la ingesta de datos hacia S3.
+
+Resources:
+
+  
+  FirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: FirehoseAccessPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Permiso para LEER del Kinesis Stream de la Plantilla 1
+              - Effect: Allow
+                Action:
+                  - kinesis:DescribeStream
+                  - kinesis:GetShardIterator
+                  - kinesis:GetRecords
+                Resource: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/EventDataStream"
+              
+              # Permiso para ESCRIBIR en el Bucket S3 de la Plantilla 1
+              - Effect: Allow
+                Action:
+                  - s3:AbortMultipartUpload
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:ListBucketMultipartUploads
+                  - s3:PutObject
+                Resource: 
+                  - !ImportValue 
+                    Fn::Sub: "${AWS::StackName}-BucketName" 
+                  - !Join 
+                    - ""
+                    - - "arn:aws:s3:::"
+                      - !ImportValue 
+                        Fn::Sub: "p5-base-stack-BucketName" # Tengo que cambiar esto por un parámetro que se pasará en el script de despliegue
+                      - "/*"
+
+  
+  DeliveryStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: EventToS3Firehose
+      DeliveryStreamType: KinesisStreamAsSource
+      KinesisStreamSourceConfiguration:
+        KinesisStreamARN: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/EventDataStream"
+        RoleARN: !GetAtt FirehoseRole.Arn
+      
+      S3DestinationConfiguration:
+        BucketARN: 
+          Fn::ImportValue: 
+            Fn::Sub: "p5-base-stack-BucketName" # Tengo que cambiar esto por un parámetro que se pasará en el script de despliegue
+        RoleARN: !GetAtt FirehoseRole.Arn
+        
+        # Estructura de carpetas en el bucket S3
+        Prefix: "raw/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
+        ErrorOutputPrefix: "errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/"
+        
+        BufferingHints:
+          IntervalInSeconds: 60 # Envía datos a S3 cada minuto
+          SizeInMBs: 5         # O cuando alcance 5MB
+        
+        # Esto basicamente comprime los archivos en S3 para ahorrar espacio, no es necesario pero tampoco esta de mas
+        CompressionFormat: GZIP
+
+Outputs:
+  FirehoseArn:
+    Description: ARN del Delivery Stream de Firehose
+    Value: !GetAtt DeliveryStream.Arn

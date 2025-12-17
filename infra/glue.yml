@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: |
+  Configuración de AWS Glue: Catálogo de datos, Crawler y Job ETL.
+  Punto 2.4.4 de la memoria técnica.
+
+Resources:
+
+  # Aqui se define la base de datos en Glue donde se almacenarán las tablas creadas por el Crawler
+  GlueDatabase:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref "AWS::AccountId"
+      DatabaseInput:
+        Name: p5_data_lake_db
+        Description: "Base de datos para el pipeline de eventos P5"
+
+  # El crawler escanea los datos en S3 y crea/actualiza las tablas en la base de datos Glue. Este se encarga de escribir en la carpeta 'processed' los datos transformados.
+  # La escritura en 'processed' se hará en el script del job ETL.
+  DataCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: p5-raw-data-crawler
+      DatabaseName: !Ref GlueDatabase
+      Role: 
+        Fn::ImportValue: 
+          Fn::Sub: "p5-base-stack-GlueServiceRoleArn"
+      
+      Targets:
+        S3Targets:
+          - Path: 
+              Fn::Join:
+                - ""
+                - - "s3://"
+                  - Fn::ImportValue: !Sub "p5-base-stack-BucketName"
+                  - "/raw/"
+      
+      # Definimos que hacer cuando se detectan cambios en el esquema de los datos y que se borren tablas obsoletas
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "DEPRECATE_IN_DATABASE"
+      
+      # Aqui se define la frecuencia con la que el crawler escanea los datos en S3
+      Schedule:
+        ScheduleExpression: "cron(0/15 * * * ? *)" # En principio cada 15 minutos, se puede ajustar luego
+
+  
+  ETLJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: p5-transform-raw-to-parquet
+      Description: "Job que transforma datos JSON a Parquet optimizado"
+      Role: 
+        Fn::ImportValue: 
+          Fn::Sub: "p5-base-stack-GlueServiceRoleArn"
+      Command:
+        Name: glueetl
+        ScriptLocation: 
+          Fn::Join:
+            - ""
+            - - "s3://"
+              - Fn::ImportValue: !Sub "p5-base-stack-BucketName"
+              - "/config/scripts/glue_job_script.py"
+        PythonVersion: "3"
+      
+      
+      GlueVersion: "4.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      
+      DefaultArguments:
+        "--job-bookmark-option": "job-bookmark-enable" # Procesa solo datos nuevos
+        "--enable-metrics": "true"
+        "--CONF_BUCKET": 
+          Fn::ImportValue: !Sub "p5-base-stack-BucketName"
+
+Outputs:
+  CrawlerName:
+    Value: !Ref DataCrawler
+  JobName:
+    Value: !Ref ETLJob

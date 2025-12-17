@@ -4,7 +4,7 @@ Description: Stack de infraestructura base para el pipeline de datos P5. Crea el
 Parameters:
   BucketPrefix:
     Type: String
-    Default: p5-memoria-datalake
+    Default: p2-datalake
     Description: Prefijo para el nombre del Bucket S3.
   ShardCount:
     Type: Number
@@ -19,6 +19,7 @@ Resources:
     
       BucketName: !Sub "${BucketPrefix}-${AWS::Region}-${AWS::AccountId}"
 
+      # Configuración para bloquear el acceso público al bucket S3. Solo se permitirá el acceso a través de políticas específicas mediante IAM.
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -28,7 +29,7 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+              SSEAlgorithm: AES256 # Cifrado del lado del servidor con AES-256, AES256 es un algoritmo utilizado para el cifrado de datos en reposo.
               
       VersioningConfiguration:
         Status: Enabled
@@ -73,6 +74,7 @@ Resources:
                 Resource:
                   - !GetAtt DataLakeBucket.Arn
                   - !Sub "${DataLakeBucket.Arn}/*"
+
 
 Outputs:
   BucketName:
