@@ -1,49 +1,13 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Configuración de Kinesis Firehose para la ingesta de datos hacia S3.
+Description: Configuración de Kinesis Firehose para la ingesta de datos hacia S3 usando LabRole.
+
+Parameters:
+  BaseStackName:
+    Type: String
+    Default: p5-base-stack
+    Description: Nombre del primer stack (el que contiene el Bucket y el Stream).
 
 Resources:
-
-  
-  FirehoseRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: firehose.amazonaws.com
-            Action: 'sts:AssumeRole'
-      Policies:
-        - PolicyName: FirehoseAccessPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              # Permiso para LEER del Kinesis Stream de la Plantilla 1
-              - Effect: Allow
-                Action:
-                  - kinesis:DescribeStream
-                  - kinesis:GetShardIterator
-                  - kinesis:GetRecords
-                Resource: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/EventDataStream"
-              
-              # Permiso para ESCRIBIR en el Bucket S3 de la Plantilla 1
-              - Effect: Allow
-                Action:
-                  - s3:AbortMultipartUpload
-                  - s3:GetBucketLocation
-                  - s3:ListBucket
-                  - s3:ListBucketMultipartUploads
-                  - s3:PutObject
-                Resource: 
-                  - !ImportValue 
-                    Fn::Sub: "${AWS::StackName}-BucketName" 
-                  - !Join 
-                    - ""
-                    - - "arn:aws:s3:::"
-                      - !ImportValue 
-                        Fn::Sub: "p5-base-stack-BucketName" # Tengo que cambiar esto por un parámetro que se pasará en el script de despliegue
-                      - "/*"
 
   
   DeliveryStream:
@@ -51,28 +15,40 @@ Resources:
     Properties:
       DeliveryStreamName: EventToS3Firehose
       DeliveryStreamType: KinesisStreamAsSource
+      
       KinesisStreamSourceConfiguration:
-        KinesisStreamARN: !Sub "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/EventDataStream"
-        RoleARN: !GetAtt FirehoseRole.Arn
+        
+        KinesisStreamARN: !Sub 
+          - "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${StreamName}"
+          - StreamName: 
+              Fn::ImportValue: !Sub "${BaseStackName}-KinesisStreamName"
+        # Usamos el LabRole existente ya que no podemos crear roles nuevos
+        RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       
       S3DestinationConfiguration:
-        BucketARN: 
-          Fn::ImportValue: 
-            Fn::Sub: "p5-base-stack-BucketName" # Tengo que cambiar esto por un parámetro que se pasará en el script de despliegue
-        RoleARN: !GetAtt FirehoseRole.Arn
+        # Importamos el nombre del bucket desde el Stack base
+        BucketARN: !Sub 
+          - "arn:aws:s3:::${BucketName}"
+          - BucketName: 
+              Fn::ImportValue: !Sub "${BaseStackName}-BucketName"
+              
+        RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
         
-        # Estructura de carpetas en el bucket S3
+        
         Prefix: "raw/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
         ErrorOutputPrefix: "errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/"
         
+        # Optimización de Buffering
         BufferingHints:
-          IntervalInSeconds: 60 # Envía datos a S3 cada minuto
-          SizeInMBs: 5         # O cuando alcance 5MB
+          IntervalInSeconds: 60 # Cada 60 segundos
+          SizeInMBs: 1          # 1 MB para poder ver los datos rápidamente en S3 durante la prueba, que si no nos pegamos vida y media
         
-        # Esto basicamente comprime los archivos en S3 para ahorrar espacio, no es necesario pero tampoco esta de mas
+        # Esto realmente no es necesario, basicamente comprime los datos al guardarlos en S3 ahorrando espacio, pero bueno tampoco esta de mas
         CompressionFormat: GZIP
 
 Outputs:
   FirehoseArn:
     Description: ARN del Delivery Stream de Firehose
     Value: !GetAtt DeliveryStream.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-FirehoseArn"

@@ -1,9 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Configuración de AWS Glue. Catálogo de datos, Crawler y Job ETL.
+Description: |
+  Configuración de AWS Glue usando LabRole. 
+  Catálogo de datos, Crawler para zona RAW y Job ETL para zona PROCESSED.
+
+Parameters:
+  BaseStackName:
+    Type: String
+    Default: p5-base-stack
+    Description: Nombre del stack base que exporta el Bucket y el LabRole ARN.
 
 Resources:
 
-  # Aqui se define la base de datos en Glue donde se almacenarán las tablas creadas por el Crawler
+  # Aqui se define la base de datos en Glue donde se almacenarán las tablas creadas por el Crawler, el crawler basicamente se encarga
+  # de leer los datos en S3 y crear las tablas correspondientes en Glue.
   GlueDatabase:
     Type: AWS::Glue::Database
     Properties:
@@ -12,7 +21,8 @@ Resources:
         Name: p5_data_lake_db
         Description: "Base de datos para el pipeline de eventos P5"
 
-  # El crawler escanea los datos en S3 y crea/actualiza las tablas en la base de datos Glue. Este se encarga de escribir en la carpeta 'processed' los datos transformados.
+  # El crawler escanea los datos en S3 y crea/actualiza las tablas en la base de datos Glue. 
+  # Este se encarga de escribir en la carpeta 'processed' los datos transformados.
   # La escritura en 'processed' se hará en el script del job ETL.
   DataCrawler:
     Type: AWS::Glue::Crawler
@@ -20,8 +30,7 @@ Resources:
       Name: p5-raw-data-crawler
       DatabaseName: !Ref GlueDatabase
       Role: 
-        Fn::ImportValue: 
-          Fn::Sub: "p5-base-stack-GlueServiceRoleArn"
+        Fn::ImportValue: !Sub "${BaseStackName}-GlueServiceRoleArn"
       
       Targets:
         S3Targets:
@@ -29,7 +38,7 @@ Resources:
               Fn::Join:
                 - ""
                 - - "s3://"
-                  - Fn::ImportValue: !Sub "p5-base-stack-BucketName"
+                  - Fn::ImportValue: !Sub "${BaseStackName}-BucketName"
                   - "/raw/"
       
       # Definimos que hacer cuando se detectan cambios en el esquema de los datos y que se borren tablas obsoletas
@@ -48,18 +57,16 @@ Resources:
       Name: p5-transform-raw-to-parquet
       Description: "Job que transforma datos JSON a Parquet optimizado"
       Role: 
-        Fn::ImportValue: 
-          Fn::Sub: "p5-base-stack-GlueServiceRoleArn"
+        Fn::ImportValue: !Sub "${BaseStackName}-GlueServiceRoleArn"
       Command:
         Name: glueetl
         ScriptLocation: 
           Fn::Join:
             - ""
             - - "s3://"
-              - Fn::ImportValue: !Sub "p5-base-stack-BucketName"
+              - Fn::ImportValue: !Sub "${BaseStackName}-BucketName"
               - "/config/scripts/glue_job_script.py"
         PythonVersion: "3"
-      
       
       GlueVersion: "4.0"
       WorkerType: G.1X
@@ -68,8 +75,14 @@ Resources:
       DefaultArguments:
         "--job-bookmark-option": "job-bookmark-enable" # Procesa solo datos nuevos
         "--enable-metrics": "true"
-        "--CONF_BUCKET": 
-          Fn::ImportValue: !Sub "p5-base-stack-BucketName"
+        # Argumentos necesarios para el script de Python
+        "--DATABASE_NAME": !Ref GlueDatabase
+        "--OUTPUT_PATH": 
+          Fn::Join:
+            - ""
+            - - "s3://"
+              - Fn::ImportValue: !Sub "${BaseStackName}-BucketName"
+              - "/processed/"
 
 Outputs:
   CrawlerName:

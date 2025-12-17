@@ -1,96 +1,52 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Stack de infraestructura base para el pipeline de datos P5. Crea el Bucket S3 (Data Lake) y el Kinesis Data Stream (Ingesta).
+Description: Stack de infraestructura base para el pipeline de datos. Crea el Bucket S3 (Data Lake) y el Kinesis Data Stream (Ingesta).
 
 Parameters:
   BucketPrefix:
     Type: String
     Default: p2-datalake
-    Description: Prefijo para el nombre del Bucket S3.
   ShardCount:
     Type: Number
     Default: 1
-    Description: Número de shards para el Kinesis Data Stream.
 
 Resources:
-
   DataLakeBucket:
     Type: AWS::S3::Bucket
     Properties:
-    
       BucketName: !Sub "${BucketPrefix}-${AWS::Region}-${AWS::AccountId}"
-
-      # Configuración para bloquear el acceso público al bucket S3. Solo se permitirá el acceso a través de políticas específicas mediante IAM.
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
-
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256 # Cifrado del lado del servidor con AES-256, AES256 es un algoritmo utilizado para el cifrado de datos en reposo.
-              
+              SSEAlgorithm: AES256
       VersioningConfiguration:
         Status: Enabled
 
-  
   EventDataStream:
     Type: AWS::Kinesis::Stream
     Properties:
       Name: EventDataStream
       ShardCount: !Ref ShardCount
-      RetentionPeriodHours: 24 # Este parametro define cuánto tiempo se retienen los datos en el stream
-
-  # Este es un rol con los permisos necesarios para que AWS Glue pueda acceder al bucket S3.
-  GlueServiceRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service:
-                - glue.amazonaws.com
-            Action:
-              - sts:AssumeRole
-      
-      
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
-        
-      
-      Policies:
-        - PolicyName: S3AccessPolicy
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - s3:GetObject
-                  - s3:PutObject
-                  - s3:ListBucket
-                Resource:
-                  - !GetAtt DataLakeBucket.Arn
-                  - !Sub "${DataLakeBucket.Arn}/*"
-
+      RetentionPeriodHours: 24
 
 Outputs:
   BucketName:
-    Description: Nombre del Data Lake Bucket
     Value: !Ref DataLakeBucket
     Export:
       Name: !Sub "${AWS::StackName}-BucketName"
 
   KinesisStreamName:
-    Description: Nombre del Kinesis Data Stream
     Value: !Ref EventDataStream
     Export:
       Name: !Sub "${AWS::StackName}-KinesisStreamName"
 
+ 
   GlueServiceRoleArn:
-    Description: ARN del rol de servicio para AWS Glue
-    Value: !GetAtt GlueServiceRole.Arn
+    Description: ARN del LabRole existente
+    Value: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
     Export:
       Name: !Sub "${AWS::StackName}-GlueServiceRoleArn"

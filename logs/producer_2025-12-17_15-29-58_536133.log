@@ -1,0 +1,8 @@
+2025-12-17 15:29:58.735 | INFO     | __main__:run_producer:32 - Conectado a Kinesis en la región us-east-1. Stream: EventDataStream
+2025-12-17 15:29:58.736 | INFO     | __main__:run_producer:37 - Iniciando envío de datos...
+2025-12-17 15:29:59.301 | SUCCESS  | __main__:run_producer:51 - Evento enviado: 48697 - Tipo: LOGIN - ShardId: shardId-000000000000
+2025-12-17 15:30:00.992 | SUCCESS  | __main__:run_producer:51 - Evento enviado: 56754 - Tipo: CLICK - ShardId: shardId-000000000000
+2025-12-17 15:30:02.954 | SUCCESS  | __main__:run_producer:51 - Evento enviado: 77670 - Tipo: LOGIN - ShardId: shardId-000000000000
+2025-12-17 15:30:03.638 | SUCCESS  | __main__:run_producer:51 - Evento enviado: 79568 - Tipo: ADD_TO_CART - ShardId: shardId-000000000000
+2025-12-17 15:30:05.043 | SUCCESS  | __main__:run_producer:51 - Evento enviado: 78673 - Tipo: LOGIN - ShardId: shardId-000000000000
+2025-12-17 15:30:05.722 | WARNING  | __main__:run_producer:57 - Productor detenido por el usuario.
