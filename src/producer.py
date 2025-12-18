@@ -50,11 +50,11 @@ def run_producer():
             
             logger.success(f"Evento enviado: {data['event_id']} - Tipo: {data['event_type']} - ShardId: {response['ShardId']}")
             
-            # Aqui esperamos un poco para no saturar el stream
+            # Aqui esperamos un poco para no saturar el stream, que si no lo vamos a petar 
             time.sleep(random.uniform(0.5, 2.0))
             
     except KeyboardInterrupt:
-        logger.warning("Productor detenido por el usuario.")
+        logger.warning("Productor detenido.")
     except Exception as e:
         logger.critical(f"Error inesperado: {e}")
 
