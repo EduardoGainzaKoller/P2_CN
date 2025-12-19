@@ -1,12 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: |
-  Configuración de AWS Glue usando LabRole. 
-  Catálogo de datos, Crawler para zona RAW y Job ETL para zona PROCESSED.
+Description: Configuración de AWS Glue usando LabRole. Catálogo de datos, Crawler para zona RAW y Job ETL para zona PROCESSED.
 
 Parameters:
   BaseStackName:
     Type: String
-    Default: p5-base-stack
+    Default: p2-s3-kinesis
     Description: Nombre del stack base que exporta el Bucket y el LabRole ARN.
 
 Resources:
