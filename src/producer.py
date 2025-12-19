@@ -5,25 +5,36 @@ import random
 from datetime import datetime
 from loguru import logger
 
-# --- CONFIGURACIÓN ---
+
 STREAM_NAME = "EventDataStream" 
 REGION = "us-east-1"
 
 # Configuración de Loguru para guardar logs en un archivo además de la consola
 logger.add("logs/producer_{time}.log", rotation="10 MB", level="INFO")
 
+# Esta función genera eventos de transacción simulando diferentes tipos de eventos de una aplicación.
 def generate_event():
     """Genera un evento de transacción simulado."""
     event_types = ['PURCHASE', 'LOGIN', 'LOGOUT', 'ADD_TO_CART', 'CLICK']
+    etype = random.choice(event_types)
     
-    return {
+    
+    event = {
         "event_id": str(random.randint(10000, 99999)),
-        "event_type": random.choice(event_types),
+        "event_type": etype,
         "user_id": f"USER_{random.randint(1, 100)}",
-        "timestamp": datetime.now().isoformat(),
-        "amount": round(random.uniform(10.0, 500.0), 2),
-        "currency": "EUR"
+        "timestamp": datetime.now().isoformat()
     }
+
+    
+    if etype in ['PURCHASE', 'ADD_TO_CART']:
+        event["amount"] = round(random.uniform(10.0, 500.0), 2)
+        event["currency"] = "EUR"
+    else:
+        event["amount"] = 0.0
+        event["currency"] = None
+
+    return event
 
 def run_producer():
     

@@ -1,54 +1,74 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Configuración de Kinesis Firehose para la ingesta de datos hacia S3 usando LabRole.
+Description: Pipeline de Ingesta Unificado. Crea un Kinesis Firehose que lee de Kinesis Data Stream y escribe en S3 con transformacion Lambda.
 
 Parameters:
   BaseStackName:
     Type: String
-    Default: p5-base-stack
-    Description: Nombre del primer stack (el que contiene el Bucket y el Stream).
+    Default: p2-s3-kinesis 
 
 Resources:
+  TransformationLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: p5-firehose-transformer
+      Handler: index.lambda_handler
+      Runtime: python3.9
+      Role: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
+      Timeout: 60
+      Code:
+        ZipFile: |
+          import json
+          import base64
+          import datetime
+          def lambda_handler(event, context):
+              output = []
+              for record in event['records']:
+                  payload = base64.b64decode(record['data']).decode('utf-8')
+                  data = json.loads(payload)
+                  data['processed_at'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                  data['is_high_value'] = data.get('amount', 0) > 100
+                  enriched_data = json.dumps(data) + '\n'
+                  output_record = {
+                      'recordId': record['recordId'],
+                      'result': 'Ok',
+                      'data': base64.b64encode(enriched_data.encode('utf-8')).decode('utf-8')
+                  }
+                  output.append(output_record)
+              return {'records': output}
 
-  
   DeliveryStream:
     Type: AWS::KinesisFirehose::DeliveryStream
     Properties:
       DeliveryStreamName: EventToS3Firehose
       DeliveryStreamType: KinesisStreamAsSource
-      
       KinesisStreamSourceConfiguration:
-        
         KinesisStreamARN: !Sub 
           - "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${StreamName}"
-          - StreamName: 
-              Fn::ImportValue: !Sub "${BaseStackName}-KinesisStreamName"
-        # Usamos el LabRole existente ya que no podemos crear roles nuevos
+          - StreamName: !ImportValue 
+              Fn::Sub: "${BaseStackName}-KinesisStreamName"
         RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
       
-      S3DestinationConfiguration:
-        # Importamos el nombre del bucket desde el Stack base
+      
+      ExtendedS3DestinationConfiguration:
         BucketARN: !Sub 
-          - "arn:aws:s3:::${BucketName}"
-          - BucketName: 
-              Fn::ImportValue: !Sub "${BaseStackName}-BucketName"
-              
+          - "arn:aws:s3:::${BName}"
+          - BName: !ImportValue 
+              Fn::Sub: "${BaseStackName}-BucketName"
         RoleARN: !Sub "arn:aws:iam::${AWS::AccountId}:role/LabRole"
-        
-        
         Prefix: "raw/year=!{timestamp:yyyy}/month=!{timestamp:MM}/day=!{timestamp:dd}/hour=!{timestamp:HH}/"
         ErrorOutputPrefix: "errors/!{firehose:error-output-type}/year=!{timestamp:yyyy}/month=!{timestamp:MM}/"
-        
-        # Optimización de Buffering
         BufferingHints:
-          IntervalInSeconds: 60 # Cada 60 segundos
-          SizeInMBs: 1          # 1 MB para poder ver los datos rápidamente en S3 durante la prueba, que si no nos pegamos vida y media
-        
-        # Esto realmente no es necesario, basicamente comprime los datos al guardarlos en S3 ahorrando espacio, pero bueno tampoco esta de mas
-        CompressionFormat: GZIP
+          IntervalInSeconds: 60
+          SizeInMBs: 1
+        CompressionFormat: UNCOMPRESSED # De momento no comprimimos para facilitar debugging y ver los datos en el S3, que sino esto es un lio
+        ProcessingConfiguration:
+          Enabled: true
+          Processors:
+            - Type: Lambda
+              Parameters:
+                - ParameterName: LambdaArn
+                  ParameterValue: !GetAtt TransformationLambda.Arn
 
 Outputs:
   FirehoseArn:
-    Description: ARN del Delivery Stream de Firehose
-    Value: !GetAtt DeliveryStream.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-FirehoseArn"
+    Value: !Ref DeliveryStream
