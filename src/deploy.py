@@ -1,3 +1,11 @@
+"""
+Este script despliega la infraestructura necesaria en AWS usando CloudFormation.
+Despliega los stacks en el orden correcto y sube el script de Glue al bucket S3.
+Sin emabrgo, no inicia el crawler de Glue automáticamente. Esto se puede hacer manualmente
+desde la consola de AWS o añadiendo código adicional para iniciar el crawler tras el despliegue.
+
+"""
+
 import boto3
 import time
 from loguru import logger

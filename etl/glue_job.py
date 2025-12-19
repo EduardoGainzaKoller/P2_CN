@@ -1,3 +1,8 @@
+"""
+Este script de Glue procesa los datos de eventos de transacción desde la zona RAW y los guarda en la zona PROCESSED.
+El script se subira al bicket S3 durante el despliegue de la infraestructura. En la carpeta config/scripts/.
+"""
+
 import sys
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions

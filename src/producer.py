@@ -1,3 +1,9 @@
+"""
+Productor de datos que envía eventos simulados a un stream de Kinesis.
+Utiliza Loguru para el logging avanzado.
+Necesita las credenciales de AWS configuradas en el entorno.
+"""
+
 import boto3
 import json
 import time
