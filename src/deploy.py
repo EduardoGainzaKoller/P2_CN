@@ -40,20 +40,17 @@ def get_bucket_name(stack_name):
 
 def run():
     try:
-        # 1. Desplegar Base
+        
         deploy_stack(STACK_BASE, 'infra/s3-kinesis.yml')
         
-        # 2. Subir script de Glue a S3 (necesario antes de lanzar el stack de Glue)
         bucket = get_bucket_name(STACK_BASE)
         logger.info(f"Subiendo script de Glue al bucket: {bucket}")
         s3.upload_file('etl/glue_job.py', bucket, 'config/scripts/glue_job_script.py')
         
-        # 3. Desplegar Ingesta (Lambda + Firehose)
         deploy_stack(STACK_INGESTA, 'infra/firehose.yml', [
             {'ParameterKey': 'BaseStackName', 'ParameterValue': STACK_BASE}
         ])
         
-        # 4. Desplegar Glue
         deploy_stack(STACK_GLUE, 'infra/glue.yml', [
             {'ParameterKey': 'BaseStackName', 'ParameterValue': STACK_BASE}
         ])
