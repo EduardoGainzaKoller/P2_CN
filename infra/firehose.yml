@@ -60,7 +60,7 @@ Resources:
         BufferingHints:
           IntervalInSeconds: 60
           SizeInMBs: 1
-        CompressionFormat: UNCOMPRESSED # De momento no comprimimos para facilitar debugging y ver los datos en el S3, que sino esto es un lio
+        CompressionFormat: UNCOMPRESSED # De momento no comprimimos para facilitar debugging y ver los datos en el S3
         ProcessingConfiguration:
           Enabled: true
           Processors:

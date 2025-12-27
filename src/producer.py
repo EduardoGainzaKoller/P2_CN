@@ -67,7 +67,7 @@ def run_producer():
             
             logger.success(f"Evento enviado: {data['event_id']} - Tipo: {data['event_type']} - ShardId: {response['ShardId']}")
             
-            # Aqui esperamos un poco para no saturar el stream, que si no lo vamos a petar 
+            # Pausa aleatoria entre envíos para simular tráfico real
             time.sleep(random.uniform(0.5, 2.0))
             
     except KeyboardInterrupt:
